@@ -114,7 +114,7 @@ void shell(void *userdata)
 			char_index++;
 			command_buffer[char_index] = '\0';
 		}
-		print_str("arno@mini-arm-os:~$ ");
+		print_str("jayjack0116@mini-arm-os:~$ ");
 		char_index = 0;
 		
 		//command input
@@ -190,6 +190,20 @@ void shell(void *userdata)
 	}
 }
 
+void task1(void *userdata){
+	while(1){
+		print_str("task1!!!\r\n");
+		for(int i = 0; i < 9999999 ; i++);
+	}
+}
+
+void task2(void *userdata){
+	while(1){
+		print_str("task2!!!\r\n");
+		for(int i = 0; i < 9999999 ; i++);
+	}
+}
+
 /* 72MHz */
 #define CPU_CLOCK_HZ 72000000
 
@@ -199,10 +213,17 @@ void shell(void *userdata)
 int main(void)
 {
 	const char *str1 = "shell";
-
+	const char *str2 = "task1";
+	const char *str3 = "task2";
 	usart_init();
+	
+	if (thread_create(task2, (void *) str3, 6) == -1)
+		print_str("Task2 creation failed\r\n");
 
-	if (thread_create(shell, (void *) str1) == -1)
+	if (thread_create(task1, (void *) str2, 8) == -1)
+		print_str("Task1 creation failed\r\n");
+
+	if (thread_create(shell, (void *) str1, 9) == -1)
 		print_str("Shell creation failed\r\n");
 
 	/* SysTick configuration */
