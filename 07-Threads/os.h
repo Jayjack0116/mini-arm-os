@@ -3,6 +3,6 @@
 
 #define MAX_TASKS 10
 #define STACK_SIZE 512
-#define MAX_HEAPS 4096
+#define MAX_HEAPS 16384
 
 #endif
