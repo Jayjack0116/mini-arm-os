@@ -11,12 +11,13 @@ typedef struct {
 	void *stack;
 	void *orig_stack;
 	uint8_t in_use;
+	uint8_t priority; /* The number bigger, the priority bigger */
 } tcb_t;
 
 static tcb_t tasks[MAX_TASKS];
 static int lastTask;
 static int first = 1;
-
+static int total_task = 0; 
 /* FIXME: Without naked attribute, GCC will corrupt r7 which is used for stack
  * pointer. If so, after restoring the tasks' context, we will get wrong stack
  * pointer.
@@ -34,10 +35,23 @@ void __attribute__((naked)) pendsv_handler()
 		lastTask++;
 		if (lastTask == MAX_TASKS)
 			lastTask = 0;
+
+		if ((lastTask != 0) && \
+			(tasks[(lastTask - 1) % total_task].priority > tasks[lastTask % total_task].priority) && \
+			tasks[(lastTask - 1) % total_task].in_use ) {
+			/* Move the task's stack pointer address into r0 */
+			lastTask--;
+			asm volatile("mov r0, %0\n" : : "r" (tasks[lastTask % total_task].stack));
+			/* Restore the new task's context and jump to the task */
+			asm volatile("ldmia r0!, {r4-r11, lr}\n"
+			             "msr psp, r0\n"
+			             "bx lr\n");
+
+		} else 
 		if (tasks[lastTask].in_use) {
 			/* Move the task's stack pointer address into r0 */
-			asm volatile("mov r0, %0\n" : : "r" (tasks[lastTask].stack));
-			/* Restore the new task's context and jump to the task */
+			asm volatile("mov r0, %0\n" : : "r" (tasks[lastTask % total_task].stack));
+		 	/* Restore the new task's context and jump to the task */
 			asm volatile("ldmia r0!, {r4-r11, lr}\n"
 			             "msr psp, r0\n"
 			             "bx lr\n");
@@ -73,7 +87,7 @@ void thread_start()
 	             "bx lr\n");
 }
 
-int thread_create(void (*run)(void *), void *userdata)
+int thread_create(void (*run)(void *), void *userdata, uint8_t set_priority)
 {
 	/* Find a free thing */
 	int threadId = 0;
@@ -86,6 +100,7 @@ int thread_create(void (*run)(void *), void *userdata)
 
 	if (threadId == MAX_TASKS)
 		return -1;
+	
 
 	/* Create the stack */
 	stack = (uint32_t *) malloc(STACK_SIZE * sizeof(uint32_t));
@@ -105,10 +120,11 @@ int thread_create(void (*run)(void *), void *userdata)
 		stack[15] = (unsigned int) run;
 		stack[16] = (unsigned int) 0x21000000; /* PSR Thumb bit */
 	}
-
+	total_task++;
 	/* Construct the control block */
 	tasks[threadId].stack = stack;
 	tasks[threadId].in_use = 1;
+	tasks[threadId].priority = set_priority;
 
 	return threadId;
 }
